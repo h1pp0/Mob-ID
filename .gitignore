@@ -1,0 +1,4 @@
+*.pdb
+Mob ID 2/bin/Debug/*
+Mob ID 2/obj/*
+*.vshost.exe
