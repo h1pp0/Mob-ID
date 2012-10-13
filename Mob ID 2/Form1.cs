@@ -12,17 +12,10 @@
 
 
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Threading;
-using FFACETools;
 
 namespace WindowsFormsApplication1
 {
@@ -30,13 +23,12 @@ namespace WindowsFormsApplication1
     {
         //Declare Variables
         int selectedApp;
-        IntPtr idaddress;
-        IntPtr nameaddress;
         public IntPtr ffximain, polhandle;
         public string playername;
         int pID, KBH, TH, target;
         public string name { get; set; }
         public Thread t1 { get; set; }
+        private Object threadLockObject = new Object();
 
 
 
@@ -65,13 +57,6 @@ namespace WindowsFormsApplication1
 
         //Import Kernal32 for Processes, WindowerHelper for TextOverlay.
         #region imports
-        [DllImport("kernel32.dll")]
-        static extern IntPtr OpenProcess(int dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, int dwProcessId);
-        [DllImport("kernel32.dll", SetLastError = true, PreserveSig = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, int nSize, out int lpNumberOfBytesRead);
-        [DllImport("kernel32.dll", SetLastError = true)]
-        static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, int nSize, out int lpNumberOfBytesWritten);
         [DllImport("WindowerHelper.dll")]
         public static extern int CreateConsoleHelper(string name);
         [DllImport("WindowerHelper.dll")]
@@ -137,27 +122,23 @@ namespace WindowsFormsApplication1
                     //1 pol
                     selectedApp = 0;
                     break;
-                case 2:
-                    //Multiple (2+)
-                    selectedApp = comboBox1.SelectedIndex;
-                    break;
             }
-
-            //Setting pID variable for Windowerhelper.
-            pID = pol[selectedApp].Id;
-            //Giving Read, Write, etc access to the process.
-
-            //setting playername for the icon near your clock
-            playername = pol[selectedApp].MainWindowTitle;
-            notifyIcon1.Text = "Mob ID - " + playername;
-
-            comboBox1.SelectedIndex = selectedApp;
-
-            //Starting the thread that reads the memory values.
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
+            if (_FFACE != null)
+            {
+                _FFACE = null;
+            }
+            if (t1 != null)
+            {
+                lock (threadLockObject)
+                {
+                    t1.Abort();
+                    t1 = null;
+                }
+            }
             //Changes the pol process. Does everything that above does, and a few more things to WindowerHelper
             selectedApp = comboBox1.SelectedIndex;
             Process[] pol = Process.GetProcessesByName("pol");
@@ -376,9 +357,13 @@ namespace WindowsFormsApplication1
                         CTHSetText(TH, "Mob ID", "" + label1.Text + " " + _FFACE.Target.Name + Environment.NewLine + label2.Text + " " + target.ToString("X"));
                         CTHFlushCommands(TH);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        MessageBox.Show("Error processing target info!", "Error");
+                        if (_FFACE == null)
+                        {
+                            return;
+                        }
+                        MessageBox.Show("Error processing target info!\n" + ex.Message, "Error");
                     }
                 }
                 Thread.Sleep(100);
